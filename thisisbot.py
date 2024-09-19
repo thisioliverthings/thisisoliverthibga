@@ -42,7 +42,34 @@ def send_challenge(chat_id, challenge_type):
 @bot.message_handler(commands=['start'])
 def handle_start(message):
     bot.send_message(message.chat.id, "Welcome to the Challenge Bot! Use /challenge to get a challenge.")
+@bot.message_handler(commands=['help'])
+def handle_help(message):
+    bot.send_message(message.chat.id, """👋 مرحبا بك في بوت التحديات والإنجازات الجماعية!
 
+🌟 مميزات البوت:
+
+1. تحديات يومية وأسبوعية:
+
+للحصول على تحدي يومي، استخدم الأمر /challenge.
+
+سنقوم بإرسال تحديات متنوعة وممتعة يمكنك حلها ومشاركة إنجازاتك.
+
+
+
+2. نظام النقاط:
+
+احصل على نقاط عند إكمال التحديات بنجاح.
+
+يمكنك متابعة تقدمك في لوحة المتصدرين القادمة عبر الأمر /leaderboard.
+
+
+
+3. التفاعل:
+
+تحدث معنا وأخبرنا إذا كنت قد أكملت تحديًا! استخدم عبارة مثل "التحدي مكتمل" للحصول على نقاط إضافية.
+
+
+""")
 @bot.message_handler(commands=['challenge'])
 def handle_challenge(message):
     chat_id = message.chat.id
@@ -69,7 +96,7 @@ def handle_message(message):
         user_data[user_id]['completed_challenges'].append(message.text)
         save_user_data()
         bot.send_message(chat_id, "Congratulations! You've earned 10 points.")
-    
+
     if "thank you" in message.text.lower():
         bot.send_message(chat_id, "You're welcome! Ready for more challenges?")
 
