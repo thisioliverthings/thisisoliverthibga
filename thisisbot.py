@@ -8,7 +8,7 @@ from requests.exceptions import ConnectionError
 from telebot.apihelper import ApiException
 from telebot.types import InlineKeyboardButton, InlineKeyboardMarkup
 
-API_TOKEN = 'YOUR_API_TOKEN'
+API_TOKEN = '7328823780:AAGgppB9_38ParQ2mdurprSFusMM97e1LAM'
 bot = telebot.TeleBot(API_TOKEN)
 
 DB_FILE = "user_data.json"
