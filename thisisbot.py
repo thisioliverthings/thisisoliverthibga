@@ -1,25 +1,28 @@
-import telebot
+import logging
 import random
 import json
 import os
-import time
-import requests
-from requests.exceptions import ConnectionError
-from telebot.apihelper import ApiException
-from telebot.types import InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext
 
+# إعداد الـ Token الخاص بالبوت
 API_TOKEN = '7328823780:AAGgppB9_38ParQ2mdurprSFusMM97e1LAM'
-bot = telebot.TeleBot(API_TOKEN)
+
+# تفعيل نظام التسجيل لمراقبة الأخطاء
+logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 DB_FILE = "user_data.json"
 CHALLENGE_FILE = "challenges.json"
 
+# تحميل بيانات المستخدمين
 if os.path.exists(DB_FILE):
     with open(DB_FILE, "r") as f:
         user_data = json.load(f)
 else:
     user_data = {}
 
+# تحميل تحديات
 if os.path.exists(CHALLENGE_FILE):
     with open(CHALLENGE_FILE, "r") as f:
         challenges = json.load(f)
@@ -29,198 +32,56 @@ else:
         "weekly": ["Write a funny story using the words 'dog', 'moon', and 'robot'.", "Create a meme about programming."]
     }
 
+# حفظ بيانات المستخدمين
 def save_user_data():
     with open(DB_FILE, "w") as f:
         json.dump(user_data, f)
 
+# حفظ التحديات
 def save_challenges():
     with open(CHALLENGE_FILE, "w") as f:
         json.dump(challenges, f)
 
-def send_challenge(chat_id, challenge_type):
+# دالة إرسال التحدي
+def send_challenge(update: Update, context: CallbackContext, challenge_type: str):
+    chat_id = update.message.chat_id
     if challenge_type in challenges:
         challenge = random.choice(challenges[challenge_type])
-        try:
-            bot.send_message(chat_id, f"Today's challenge is: {challenge}")
-        except (ConnectionError, ApiException) as e:
-            print(f"Error sending message: {e}")
-            retry_send_message(chat_id, f"Today's challenge is: {challenge}")
+        context.bot.send_message(chat_id=chat_id, text=f"Today's challenge is: {challenge}")
     else:
-        bot.send_message(chat_id, "No challenges available at the moment.")
+        context.bot.send_message(chat_id=chat_id, text="No challenges available at the moment.")
 
-def retry_send_message(chat_id, text, retries=5, delay=3):
-    """Attempt to resend the message in case of failure."""
-    for attempt in range(retries):
-        try:
-            bot.send_message(chat_id, text)
-            break
-        except (ConnectionError, ApiException) as e:
-            print(f"Retry {attempt + 1}/{retries} failed: {e}")
-            time.sleep(delay)
+# التعامل مع الأمر /start
+def start(update: Update, context: CallbackContext) -> None:
+    update.message.reply_text("Welcome to the Challenge Bot! Use /challenge to get a challenge.")
 
-@bot.message_handler(commands=['start'])
-def handle_start(message):
-    try:
-        bot.send_message(message.chat.id, "Welcome to the Challenge Bot! Use /challenge to get a challenge.")
-    except (ConnectionError, ApiException) as e:
-        print(f"Error sending message: {e}")
-        retry_send_message(message.chat.id, "Welcome to the Challenge Bot! Use /challenge to get a challenge.")
-
-@bot.message_handler(commands=['help'])
-def handle_help(message):
-    keyboard = InlineKeyboardMarkup()
-    button = InlineKeyboardButton(text="المالك للإبلاغ عن مشكلة", url="https://t.me/oliceer")
-    keyboard.add(button)
-    
-    try:
-        bot.send_message(message.chat.id, 
-                         """**🔹 مرحبا بك في بوت التحديات!**
-
-**🎯 الميزات:**
-
-**1. تحديات يومية وأسبوعية:**  
-استخدم `/challenge` للحصول على تحديات ممتعة.
-
-**2. نظام النقاط:**  
-اجمع النقاط بإكمال التحديات وتابع تقدمك عبر `/leaderboard`.
-
-**3. التفاعل:**  
-- استخدم "challenge completed" للحصول على نقاط إضافية.  
-- استخدم "thank you" للرد على الشكر.
-
-**4. ألعاب وترفيه:**  
-- **نكتة:** `/joke`  
-- **اقتباس:** `/quote`  
-- **حظ:** `/luck`  
-- **ألغاز:** `/quiz`  
-- **حجر، ورقة، مقص:** `/rps`
-
-**5. حقائق ممتعة:**  
-- `/fact`
-
-**📘 لمزيد من المعلومات، استخدم `/help`.**
-
-**استمتع بالتحديات والألعاب!**""",
-                         parse_mode='Markdown',
-                         reply_markup=keyboard)
-    except (ConnectionError, ApiException) as e:
-        print(f"Error sending message: {e}")
-        retry_send_message(message.chat.id, 
-                           """**🔹 مرحبا بك في بوت التحديات!**
-
-**🎯 الميزات:**
-
-**1. تحديات يومية وأسبوعية:**  
-استخدم `/challenge` للحصول على تحديات ممتعة.
-
-**2. نظام النقاط:**  
-اجمع النقاط بإكمال التحديات وتابع تقدمك عبر `/leaderboard`.
-
-**3. التفاعل:**  
-- استخدم "challenge completed" للحصول على نقاط إضافية.  
-- استخدم "thank you" للرد على الشكر.
-
-**4. ألعاب وترفيه:**  
-- **نكتة:** `/joke`  
-- **اقتباس:** `/quote`  
-- **حظ:** `/luck`  
-- **ألغاز:** `/quiz`  
-- **حجر، ورقة، مقص:** `/rps`
-
-**5. حقائق ممتعة:**  
-- `/fact`
-
-**📘 لمزيد من المعلومات، استخدم `/help`.**
-
-**استمتع بالتحديات والألعاب!**""",
-                           reply_markup=keyboard)
-
-@bot.message_handler(commands=['challenge'])
-def handle_challenge(message):
-    chat_id = message.chat.id
-    send_challenge(chat_id, 'daily')
-
-@bot.message_handler(commands=['leaderboard'])
-def handle_leaderboard(message):
-    chat_id = message.chat.id
-    try:
-        bot.send_message(chat_id, "Leaderboard feature is coming soon!")
-    except (ConnectionError, ApiException) as e:
-        print(f"Error sending message: {e}")
-        retry_send_message(chat_id, "Leaderboard feature is coming soon!")
-
-@bot.message_handler(commands=['joke'])
-def handle_joke(message):
-    jokes = [
-        "لماذا لا تذهب البرمجة إلى الشاطئ؟ لأنها لا تحب الغرق في الأخطاء!",
-        "ما هو الشيء الذي لا يعمل بدون خطأ؟ البرنامج المثالي!"
+# التعامل مع الأمر /help
+def help_command(update: Update, context: CallbackContext) -> None:
+    keyboard = [
+        [InlineKeyboardButton("المالك للإبلاغ عن مشكلة", url="https://t.me/oliceer")]  # ضع الرابط الخاص بك هنا
     ]
-    bot.send_message(message.chat.id, random.choice(jokes))
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    update.message.reply_text(
+        """👋 مرحبا بك في بوت التحديات!
 
-@bot.message_handler(commands=['quote'])
-def handle_quote(message):
-    quotes = [
-        "النجاح هو القدرة على الذهاب من فشل إلى فشل دون فقدان الحماس - وينستون تشرشل",
-        "إذا كنت تستطيع الحلم بشيء، يمكنك تحقيقه - والت ديزني"
-    ]
-    bot.send_message(message.chat.id, random.choice(quotes))
+🌟 مميزات البوت:
+- تحديات يومية وأسبوعية: استخدم /challenge للحصول على التحديات.
+- نظام النقاط: احصل على نقاط عند إكمال التحديات.
+- تفاعل معنا وأكمل التحديات للحصول على المزيد من النقاط!""",
+        reply_markup=reply_markup
+    )
 
-@bot.message_handler(commands=['luck'])
-def handle_luck(message):
-    lucky_number = random.randint(1, 10)
-    bot.send_message(message.chat.id, "اختر رقمًا بين 1 و 10، وأرسل الرقم!")
+# التعامل مع الأمر /challenge
+def challenge(update: Update, context: CallbackContext) -> None:
+    send_challenge(update, context, 'daily')
 
-    @bot.message_handler(func=lambda msg: msg.text.isdigit())
-    def guess_number(msg):
-        if int(msg.text) == lucky_number:
-            bot.send_message(msg.chat.id, "🎉 تهانينا! لقد ربحت.")
-        else:
-            bot.send_message(msg.chat.id, "حاول مرة أخرى!")
+# التعامل مع الرسائل العامة
+def handle_message(update: Update, context: CallbackContext) -> None:
+    chat_id = update.message.chat_id
+    user_id = update.message.from_user.id
+    user_text = update.message.text.strip().lower()
 
-@bot.message_handler(commands=['fact'])
-def handle_fact(message):
-    facts = [
-        "هل تعلم أن النحل يمكنه التعرف على الوجوه؟",
-        "القطط تحلم مثل البشر أثناء النوم!"
-    ]
-    bot.send_message(message.chat.id, random.choice(facts))
-
-@bot.message_handler(commands=['quiz'])
-def handle_quiz(message):
-    questions = [
-        {"question": "ما هي عاصمة فرنسا؟", "answer": "باريس"},
-        {"question": "ما هو أكبر كوكب في نظامنا الشمسي؟", "answer": "المشتري"}
-    ]
-    question = random.choice(questions)
-    bot.send_message(message.chat.id, question["question"])
-
-    @bot.message_handler(func=lambda msg: msg.text.lower() == question["answer"].lower())
-    def correct_answer(msg):
-        bot.send_message(msg.chat.id, "🎉 إجابة صحيحة! لقد حصلت على 10 نقاط.")
-
-@bot.message_handler(commands=['rps'])
-def handle_rps(message):
-    choices = ["حجر", "ورقة", "مقص"]
-    bot.send_message(message.chat.id, "اختر: حجر، ورقة، مقص؟")
-
-    @bot.message_handler(func=lambda msg: msg.text in choices)
-    def play_rps(msg):
-        user_choice = msg.text
-        bot_choice = random.choice(choices)
-        bot.send_message(msg.chat.id, f"اخترت: {bot_choice}")
-        if user_choice == bot_choice:
-            bot.send_message(msg.chat.id, "إنه تعادل!")
-        elif (user_choice == "حجر" and bot_choice == "مقص") or (user_choice == "ورقة" and bot_choice == "حجر") or (user_choice == "مقص" and bot_choice == "ورقة"):
-            bot.send_message(msg.chat.id, "🎉 أنت الفائز!")
-        else:
-            bot.send_message(msg.chat.id, "البوت فاز! حظًا أوفر في المرة القادمة.")
-
-@bot.message_handler(func=lambda message: True)
-def handle_message(message):
-    chat_id = message.chat.id
-    user_id = message.from_user.id
-    user_text = message.text.strip().lower()
-
+    # إذا لم يكن المستخدم موجودًا في قاعدة البيانات
     if user_id not in user_data:
         user_data[user_id] = {
             'points': 0,
@@ -240,52 +101,47 @@ def handle_message(message):
             user_data[user_id]['active_challenge'] = None
             save_user_data()
 
-            response_message = "🎉 إجابة صحيحة! لقد حصلت على 10 نقاط."
+            response_message = "إجابة صحيحة! لقد حصلت على 10 نقاط."
         else:
             response_message = "الإجابة غير صحيحة. حاول مرة أخرى!"
 
-        # إرسال استجابة للإجابة
-        try:
-            bot.send_message(chat_id, response_message)
-        except (ConnectionError, ApiException) as e:
-            print(f"Error sending message: {e}")
-            retry_send_message(chat_id, response_message)
-    
+        context.bot.send_message(chat_id=chat_id, text=response_message)
+
     # التعامل مع العبارات المتعلقة بإكمال التحديات
     elif "challenge completed" in user_text:
         if user_data[user_id]['completed_challenges']:
             user_data[user_id]['points'] += 10
             save_user_data()
-            response_message = "🎉 تهانينا! لقد حصلت على 10 نقاط إضافية."
+            response_message = "تهانينا! لقد حصلت على 10 نقاط إضافية."
         else:
             response_message = "لم تقم بإكمال أي تحديات بعد."
 
-        try:
-            bot.send_message(chat_id, response_message)
-        except (ConnectionError, ApiException) as e:
-            print(f"Error sending message: {e}")
-            retry_send_message(chat_id, response_message)
+        context.bot.send_message(chat_id=chat_id, text=response_message)
 
-    # تعامل مع عبارات شكر
-    elif "شكرا" in user_text :
-        response_message = "على الرحب والسعة! هل ترغب في المزيد من التحديات?"
-        try:
-            bot.send_message(chat_id, response_message)
-        except (ConnectionError, ApiException) as e:
-            print(f"Error sending message: {e}")
-            retry_send_message(chat_id, response_message)
+    # تعامل مع عبارات الشكر
+    elif "thank you" in user_text:
+        context.bot.send_message(chat_id=chat_id, text="على الرحب والسعة! هل ترغب في المزيد من التحديات؟")
 
-    # توفير رسالة افتراضية لجميع الرسائل غير المعروفة
+    # توفير رسالة افتراضية للرسائل غير المعروفة
     else:
-        response_message = "آسف، لم أفهم طلبك. يرجى استخدام الأوامر المتاحة مثل /challenge للحصول على التحديات."
-        keyboard = InlineKeyboardMarkup()
-        button = InlineKeyboardButton(text="المطور للإبلاغ عن مشكلة", url="https://t.me/oliceer")
-        keyboard.add(button)
-        
-        try:
-            bot.send_message(chat_id, response_message, reply_markup=keyboard)
-        except (ConnectionError, ApiException) as e:
-            print(f"Error sending message: {e}")
-            retry_send_message(chat_id, response_message)
+        context.bot.send_message(chat_id=chat_id, text="آسف، لم أفهم طلبك. يرجى استخدام الأوامر المتاحة مثل /challenge للحصول على التحديات.")
 
-bot.polling()
+# الدالة الرئيسية لتشغيل البوت
+def main() -> None:
+    updater = Updater(API_TOKEN)
+    dispatcher = updater.dispatcher
+
+    # تسجيل الأوامر المختلفة
+    dispatcher.add_handler(CommandHandler("start", start))
+    dispatcher.add_handler(CommandHandler("help", help_command))
+    dispatcher.add_handler(CommandHandler("challenge", challenge))
+
+    # تسجيل الرسائل العامة
+    dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, handle_message))
+
+    # تشغيل البوت
+    updater.start_polling()
+    updater.idle()
+
+if __name__ == '__main__':
+    main()
