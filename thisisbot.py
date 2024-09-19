@@ -8,7 +8,7 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.error import NetworkError, Unauthorized, InvalidToken
 
 # إعداد الـ Token الخاص بالبوت
-API_TOKEN = '7328823780:AAGgppB9_38ParQ2mdurprSFusMM97e1LAM'
+API_TOKEN = '8119443898:AAFwm5E368v-Ov-M_XGBQYCJxj1vMDQbv-0'
 OWNER_CHAT_ID = 'your_owner_chat_id'  # ضع رقم دردشة المالك هنا
 
 # تفعيل نظام التسجيل لمراقبة الأخطاء
