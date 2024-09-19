@@ -3,7 +3,6 @@ import json
 import os
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import Updater, CommandHandler, CallbackContext, MessageHandler, Filters, CallbackQueryHandler
-from telegram.error import NetworkError, Unauthorized, InvalidToken
 from datetime import datetime, timedelta
 from threading import Timer
 
@@ -171,6 +170,19 @@ def start(update: Update, context: CallbackContext) -> None:
         reply_markup=reply_markup
     )
 
+# التعامل مع تغيير اللغة
+def set_language(update: Update, context: CallbackContext) -> None:
+    query = update.callback_query
+    user_id = query.from_user.id
+    language = 'العربية' if query.data == 'set_language_ar' else 'English'
+    user_data.setdefault(user_id, {})['language'] = language
+    save_user_data()
+
+    context.bot.send_message(
+        chat_id=user_id,
+        text=f"تم تغيير اللغة إلى: {language}"
+    )
+
 # التعامل مع الأمر /change_language
 def change_language(update: Update, context: CallbackContext) -> None:
     keyboard = [
@@ -184,10 +196,6 @@ def change_language(update: Update, context: CallbackContext) -> None:
         reply_markup=reply_markup
     )
 
-# دالة لإرسال إشعار للمالك عند حدوث خطأ
-def notify_owner(message, context):
-    context.bot.send_message(chat_id=OWNER_CHAT_ID, text=f"Error occurred: {message}")
-
 # الدالة الرئيسية لتشغيل البوت
 def main() -> None:
     updater = Updater(API_TOKEN, use_context=True)
@@ -195,4 +203,19 @@ def main() -> None:
 
     # تسجيل الأوامر المختلفة
     dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, handle_message))
-    dispatcher
+    dispatcher.add_handler(CommandHandler('start', start))
+    dispatcher.add_handler(CommandHandler('change_language', change_language))
+    dispatcher.add_handler(CallbackQueryHandler(button))
+    dispatcher.add_handler(CallbackQueryHandler(set_language, pattern='^set_language_'))
+
+    # تشغيل البوت
+    try:
+        updater.start_polling()
+        updater.idle()
+    except (NetworkError, Unauthorized, InvalidToken) as e:
+        logger.error(f"Error starting the bot: {e}")
+        with open(error_log_file, "a") as f:
+            f.write(f"{datetime.now()}: {e}\n")
+
+if __name__ == '__main__':
+    main()r(Filters.text & ~Filters.command, handle_message
