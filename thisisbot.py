@@ -1,88 +1,64 @@
-# إعداد الـ Token الخاص بالبوت
 import logging
 import random
 import json
 import os
-import time
-from telegram.ext import Updater, CommandHandler, CallbackContext, MessageHandler, Filters
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
+import asyncio
+import aioredis  # مكتبة Redis غير المتزامنة
+from aiohttp import ClientSession  # مكتبة HTTP غير المتزامنة
+from telegram import Update
+from telegram.ext import Application, CommandHandler, MessageHandler, filters
 from telegram.error import NetworkError, Unauthorized, InvalidToken
 
+# إعداد الـ Token الخاص بالبوت
 API_TOKEN = '8119443898:AAFwm5E368v-Ov-M_XGBQYCJxj1vMDQbv-0'
-OWNER_CHAT_ID = '7161132306'  # ضع رقم دردشة المالك هنا
+OWNER_CHAT_ID = '7161132306'
 
 # إعداد تسجيل الأخطاء
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
                     level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-DB_FILE = "user_data.json"
-if os.path.exists(DB_FILE):
-    with open(DB_FILE, "r") as f:
-        user_data = json.load(f)
-else:
-    user_data = {}
+# إعداد Redis
+REDIS_URL = 'redis://localhost'
+redis = aioredis.from_url(REDIS_URL, decode_responses=True)
 
-# حفظ بيانات المستخدمين
-def save_user_data():
-    with open(DB_FILE, "w") as f:
-        json.dump(user_data, f)
+# دالة لحفظ البيانات في Redis
+async def save_user_data(user_id, data):
+    await redis.hmset_dict(f"user:{user_id}", data)
 
-# دالة للتحقق من وجود مستخدم في قاعدة البيانات
-def get_user(user_id):
-    if user_id not in user_data:
-        user_data[user_id] = {
+# دالة لاسترجاع البيانات من Redis
+async def get_user_data(user_id):
+    user_data = await redis.hgetall(f"user:{user_id}")
+    if not user_data:
+        user_data = {
             'balance': 100,  # رصيد افتراضي أولي
             'completed_challenges': [],
         }
-        save_user_data()
-    return user_data[user_id]
-
-# إضافة دالة إعادة المحاولة التلقائية
-def retry_after_delay(func, max_retries=5):
-    retries = 0
-    while retries < max_retries:
-        try:
-            func()
-            break
-        except NetworkError as e:
-            retries += 1
-            wait_time = 2 ** retries  # مضاعفة وقت الانتظار بعد كل محاولة
-            logger.error(f"NetworkError: {e}. إعادة المحاولة بعد {wait_time} ثانية...")
-            time.sleep(wait_time)
-        except Unauthorized as e:
-            logger.error(f"Unauthorized: {e}. لا يمكن إكمال العملية.")
-            break
-        except InvalidToken as e:
-            logger.error(f"InvalidToken: {e}. تحقق من صحة الـ Token.")
-            break
-
-# دالة لإشعار المالك عند حدوث خطأ
-def notify_owner(message, context):
-    context.bot.send_message(chat_id=OWNER_CHAT_ID, text=f"Error occurred: {message}")
+        await save_user_data(user_id, user_data)
+    return user_data
 
 # أمر لعرض الرصيد
-def balance(update: Update, context: CallbackContext) -> None:
+async def balance(update: Update, context) -> None:
     user_id = update.message.from_user.id
-    user = get_user(user_id)
-    update.message.reply_text(f"💰 رصيدك الحالي: {user['balance']} عملة.")
+    user = await get_user_data(user_id)
+    await update.message.reply_text(f"💰 رصيدك الحالي: {user['balance']} عملة.")
 
 # أمر لجمع العملات
-def earn(update: Update, context: CallbackContext) -> None:
+async def earn(update: Update, context) -> None:
     user_id = update.message.from_user.id
-    user = get_user(user_id)
+    user = await get_user_data(user_id)
     earned_amount = random.randint(10, 50)
     user['balance'] += earned_amount
-    save_user_data()
-    update.message.reply_text(f"🎉 لقد حصلت على {earned_amount} عملة! رصيدك الحالي هو {user['balance']}.")
+    await save_user_data(user_id, user)
+    await update.message.reply_text(f"🎉 لقد حصلت على {earned_amount} عملة! رصيدك الحالي هو {user['balance']}.")
 
 # أمر لبدء البوت
-def start(update: Update, context: CallbackContext) -> None:
-    update.message.reply_text("مرحبًا بك في بوت الاقتصاد! استخدم /balance لمعرفة رصيدك و/earn لجمع العملات.")
+async def start(update: Update, context) -> None:
+    await update.message.reply_text("مرحبًا بك في بوت الاقتصاد! استخدم /balance لمعرفة رصيدك و/earn لجمع العملات.")
 
 # أمر المساعدة
-def help_command(update: Update, context: CallbackContext) -> None:
-    update.message.reply_text("""
+async def help_command(update: Update, context) -> None:
+    await update.message.reply_text("""
 أوامر البوت المتاحة:
 - /balance: لمعرفة رصيدك.
 - /earn: لجمع العملات.
@@ -90,32 +66,44 @@ def help_command(update: Update, context: CallbackContext) -> None:
     """)
 
 # التعامل مع الرسائل العامة
-def handle_message(update: Update, context: CallbackContext) -> None:
-    try:
-        update.message.reply_text("يرجى استخدام الأوامر المتاحة مثل /balance و/earn.")
-    except (NetworkError, Unauthorized, InvalidToken) as e:
-        logger.error(f"Exception occurred: {e}")
-        notify_owner(f"Exception occurred: {e}", context)
+async def handle_message(update: Update, context) -> None:
+    await update.message.reply_text("يرجى استخدام الأوامر المتاحة مثل /balance و/earn.")
+
+# دالة لإرسال إشعار للمالك عند حدوث خطأ
+async def notify_owner(message, context):
+    await context.bot.send_message(chat_id=OWNER_CHAT_ID, text=f"Error occurred: {message}")
+
+# التعامل مع الأخطاء
+async def handle_error(update: Update, context) -> None:
+    error = context.error
+    logger.error(f"Exception occurred: {error}")
+    await notify_owner(f"Exception occurred: {error}", context)
+
+# تحسين استدعاءات API باستخدام aiohttp
+async def fetch_external_data(url):
+    async with ClientSession() as session:
+        async with session.get(url) as response:
+            return await response.json()
 
 # الدالة الرئيسية لتشغيل البوت
-def main() -> None:
-    updater = Updater(API_TOKEN)
-    dispatcher = updater.dispatcher
+async def main() -> None:
+    application = Application.builder().token(API_TOKEN).build()
 
     # أوامر البوت
-    dispatcher.add_handler(CommandHandler("start", start))
-    dispatcher.add_handler(CommandHandler("help", help_command))
-    dispatcher.add_handler(CommandHandler("balance", balance))
-    dispatcher.add_handler(CommandHandler("earn", earn))
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(CommandHandler("help", help_command))
+    application.add_handler(CommandHandler("balance", balance))
+    application.add_handler(CommandHandler("earn", earn))
 
     # التعامل مع الرسائل العامة
-    dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, handle_message))
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
-    # تشغيل البوت مع إعادة المحاولة عند فشل الاتصال
-    retry_after_delay(updater.start_polling)
+    # التعامل مع الأخطاء
+    application.add_error_handler(handle_error)
 
-    # الحفاظ على البوت في وضع التشغيل
-    updater.idle()
+    # تشغيل البوت
+    await application.start_polling()
+    await application.idle()
 
 if __name__ == '__main__':
-    main()
+    asyncio.run(main())
