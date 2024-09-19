@@ -59,7 +59,7 @@ def start(update: Update, context: CallbackContext) -> None:
 # التعامل مع الأمر /help
 def help_command(update: Update, context: CallbackContext) -> None:
     keyboard = [
-        [InlineKeyboardButton("المالك للإبلاغ عن مشكلة", url="YOUR_URL_HERE")]  # ضع الرابط الخاص بك هنا
+        [InlineKeyboardButton("المالك للإبلاغ عن مشكلة", url="https://t.me/oliceer")]  # ضع الرابط الخاص بك هنا
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     update.message.reply_text(
