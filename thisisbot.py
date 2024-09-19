@@ -1,11 +1,11 @@
 import logging
-import random
 import json
 import os
-import asyncio
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
-from telegram.ext import Updater, CommandHandler, CallbackContext, MessageHandler, Filters
+from telegram.ext import Updater, CommandHandler, CallbackContext, MessageHandler, Filters, CallbackQueryHandler
 from telegram.error import NetworkError, Unauthorized, InvalidToken
+from datetime import datetime, timedelta
+from threading import Timer
 
 # إعداد الـ Token الخاص بالبوت
 API_TOKEN = '8119443898:AAFwm5E368v-Ov-M_XGBQYCJxj1vMDQbv-0'
@@ -37,118 +37,154 @@ def save_user_data():
     with open(DB_FILE, "w") as f:
         json.dump(user_data, f)
 
-# دالة إرسال التحدي
-async def send_challenge(update: Update, context: CallbackContext, challenge_type: str):
-    chat_id = update.message.chat_id
-    challenges = {
-        "daily": ["Solve the riddle: What has keys but can't open locks?", "Guess the number between 1 and 10."],
-        "weekly": ["Write a funny story using the words 'dog', 'moon', and 'robot'.", "Create a meme about programming."]
-    }
-    if challenge_type in challenges:
-        challenge = random.choice(challenges[challenge_type])
-        await context.bot.send_message(chat_id=chat_id, text=f"Today's challenge is: {challenge}")
-    else:
-        await context.bot.send_message(chat_id=chat_id, text="No challenges available at the moment.")
+# دالة لإرسال إشعارات تذكيرية
+def send_reminder(update: Update, context: CallbackContext, message: str):
+    context.bot.send_message(chat_id=update.message.chat_id, text=message)
+
+# التذكير بالمواعيد
+def schedule_reminder(chat_id: int, message: str, delay: int):
+    Timer(delay, send_reminder, args=(chat_id, message)).start()
 
 # التعامل مع الأمر /start
-async def start(update: Update, context: CallbackContext) -> None:
-    await update.message.reply_text("Welcome to the Challenge Bot! Use /challenge to get a challenge.")
+def start(update: Update, context: CallbackContext) -> None:
+    user_id = update.message.from_user.id
+    user_data.setdefault(user_id, {'language': 'العربية', 'balance': 0})
+    save_user_data()
 
-# التعامل مع الأمر /help
-async def help_command(update: Update, context: CallbackContext) -> None:
     keyboard = [
-        [InlineKeyboardButton("المالك للإبلاغ عن مشكلة", url="https://t.me/oliceer")]
+        [InlineKeyboardButton("العربية", callback_data='set_language_ar')],
+        [InlineKeyboardButton("English", callback_data='set_language_en')]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
-    await update.message.reply_text(
-        """👋 مرحبا بك في بوت التحديات!
 
-🌟 مميزات البوت:
-- تحديات يومية وأسبوعية: استخدم /challenge للحصول على التحديات.
-- نظام النقاط: احصل على نقاط عند إكمال التحديات.
-- تفاعل معنا وأكمل التحديات للحصول على المزيد من النقاط!""",
+    update.message.reply_text(
+        "مرحبًا بك! من فضلك اختر لغتك:",
         reply_markup=reply_markup
     )
 
-# التعامل مع الأمر /challenge
-async def challenge(update: Update, context: CallbackContext) -> None:
-    await send_challenge(update, context, 'daily')
+# التعامل مع الأمر /change_language
+def change_language(update: Update, context: CallbackContext) -> None:
+    keyboard = [
+        [InlineKeyboardButton("العربية", callback_data='set_language_ar')],
+        [InlineKeyboardButton("English", callback_data='set_language_en')]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
 
-# الدالة لإرسال إشعار للمالك عند حدوث خطأ
-async def notify_owner(message, context):
-    await context.bot.send_message(chat_id=OWNER_CHAT_ID, text=f"Error occurred: {message}")
+    update.message.reply_text(
+        "اختر لغتك:",
+        reply_markup=reply_markup
+    )
+
+# دالة عرض المساعدة
+def help_command(update: Update, context: CallbackContext) -> None:
+    keyboard = [
+        [InlineKeyboardButton("القسم 1: الأوامر الأساسية", callback_data='help_section_1')],
+        [InlineKeyboardButton("القسم 2: نظام النقاط", callback_data='help_section_2')],
+        [InlineKeyboardButton("القسم 3: إدارة اللغة", callback_data='help_section_3')]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    update.message.reply_text(
+        "مرحبًا! اختر قسمًا لعرض الشرح:",
+        reply_markup=reply_markup
+    )
+
+# دالة للتعامل مع أزرار الشرح
+def button(update: Update, context: CallbackContext) -> None:
+    query = update.callback_query
+    user_id = query.from_user.id
+
+    help_texts = {
+        'help_section_1': (
+            "📜 **الأوامر الأساسية:**\n"
+            "1. **بدء:** /start - لبدء التفاعل مع البوت.\n"
+            "2. **تغيير اللغة:** /غير_اللغة - لتغيير لغة البوت.\n"
+            "3. **مساعدة:** /help - لعرض تعليمات الاستخدام."
+        ),
+        'help_section_2': (
+            "📊 **نظام النقاط:**\n"
+            "1. **رصيدك:** اكتب 'رصيدي' لمعرفة رصيدك الحالي.\n"
+            "2. **إيداع:** اكتب 'إيداع [المبلغ]' لإيداع المال في رصيدك.\n"
+            "3. **سحب:** اكتب 'سحب [المبلغ]' لسحب المال من رصيدك."
+        ),
+        'help_section_3': (
+            "🌐 **إدارة اللغة:**\n"
+            "1. **اختيار اللغة:** عند بدء التفاعل مع البوت، يمكنك اختيار لغتك.\n"
+            "2. **تغيير اللغة:** استخدم الأمر '/غير_اللغة' لتغيير اللغة لاحقًا."
+        )
+    }
+
+    response_message = help_texts.get(query.data, "قسم غير معروف.")
+    query.answer()
+    query.edit_message_text(text=response_message)
 
 # التعامل مع الرسائل العامة
-async def handle_message(update: Update, context: CallbackContext) -> None:
-    chat_id = update.message.chat_id
+def handle_message(update: Update, context: CallbackContext) -> None:
     user_id = update.message.from_user.id
     user_text = update.message.text.strip().lower()
+    user_language = user_data.get(user_id, {}).get('language', 'العربية')
 
-    # إذا لم يكن المستخدم موجودًا في قاعدة البيانات
-    if user_id not in user_data:
-        user_data[user_id] = {
-            'points': 0,
-            'completed_challenges': [],
-            'active_challenge': None
+    # تقديم الدعم باللغتين
+    if user_language == 'العربية':
+        responses = {
+            "balance": "رصيدك الحالي: {balance}",
+            "reward": "لقد حصلت على مكافأة قدرها {amount}!",
+            "thank_you": "على الرحب والسعة! هل تحتاج إلى مساعدة أخرى؟",
         }
-        save_user_data()
+    else:
+        responses = {
+            "balance": "Your current balance is: {balance}",
+            "reward": "You have earned a reward of {amount}!",
+            "thank_you": "You're welcome! Do you need any more help?",
+        }
 
-    try:
-        # معالجة التحديات النشطة
-        if user_data[user_id]['active_challenge']:
-            active_challenge = user_data[user_id]['active_challenge']
-            expected_answer = active_challenge['answer'].strip().lower()
+    if user_text == "رصيدي":
+        balance = user_data.get(user_id, {}).get('balance', 0)
+        response_message = responses["balance"].format(balance=balance)
+        context.bot.send_message(chat_id=update.message.chat_id, text=response_message)
 
-            if user_text == expected_answer:
-                user_data[user_id]['points'] += 10
-                user_data[user_id]['completed_challenges'].append(active_challenge['question'])
-                user_data[user_id]['active_challenge'] = None
-                save_user_data()
-                response_message = "إجابة صحيحة! لقد حصلت على 10 نقاط."
-            else:
-                response_message = "الإجابة غير صحيحة. حاول مرة أخرى!"
-
-            await context.bot.send_message(chat_id=chat_id, text=response_message)
-
-        # التعامل مع العبارات المتعلقة بإكمال التحديات
-        elif "challenge completed" in user_text:
-            if user_data[user_id]['completed_challenges']:
-                user_data[user_id]['points'] += 10
-                save_user_data()
-                response_message = "تهانينا! لقد حصلت على 10 نقاط إضافية."
-            else:
-                response_message = "لم تقم بإكمال أي تحديات بعد."
-
-            await context.bot.send_message(chat_id=chat_id, text=response_message)
-
-        # تعامل مع عبارات الشكر
-        elif "thank you" in user_text:
-            await context.bot.send_message(chat_id=chat_id, text="على الرحب والسعة! هل ترغب في المزيد من التحديات؟")
-
-        # توفير رسالة افتراضية للرسائل غير المعروفة
+    elif user_text.startswith("سحب"):
+        amount = int(user_text.split()[1])
+        if user_data.get(user_id, {}).get('balance', 0) >= amount:
+            user_data[user_id]['balance'] -= amount
+            save_user_data()
+            response_message = responses["reward"].format(amount=amount)
+            context.bot.send_message(chat_id=update.message.chat_id, text=response_message)
         else:
-            await context.bot.send_message(chat_id=chat_id, text="آسف، لم أفهم طلبك. يرجى استخدام الأوامر المتاحة مثل /challenge للحصول على التحديات.")
+            context.bot.send_message(chat_id=update.message.chat_id, text="رصيدك غير كافٍ.")
 
-    except (NetworkError, Unauthorized, InvalidToken) as e:
-        logger.error(f"Exception occurred: {e}")
-        await notify_owner(f"Exception occurred: {e}", context)
+    elif user_text.startswith("إيداع"):
+        amount = int(user_text.split()[1])
+        user_data[user_id]['balance'] += amount
+        save_user_data()
+        response_message = responses["reward"].format(amount=amount)
+        context.bot.send_message(chat_id=update.message.chat_id, text=response_message)
+
+    elif "شكرًا" in user_text:
+        context.bot.send_message(chat_id=update.message.chat_id, text=responses["thank_you"])
+
+    else:
+        context.bot.send_message(chat_id=update.message.chat_id, text="لم أفهم طلبك. حاول مرة أخرى.")
+
+# الدالة لإرسال إشعار للمالك عند حدوث خطأ
+def notify_owner(message, context):
+    context.bot.send_message(chat_id=OWNER_CHAT_ID, text=f"Error occurred: {message}")
 
 # الدالة الرئيسية لتشغيل البوت
-async def main() -> None:
+def main() -> None:
     updater = Updater(API_TOKEN, use_context=True)
     dispatcher = updater.dispatcher
 
     # تسجيل الأوامر المختلفة
     dispatcher.add_handler(CommandHandler("start", start))
+    dispatcher.add_handler(CommandHandler("غير_اللغة", change_language))
     dispatcher.add_handler(CommandHandler("help", help_command))
-    dispatcher.add_handler(CommandHandler("challenge", challenge))
-
-    # تسجيل الرسائل العامة
     dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, handle_message))
+    dispatcher.add_handler(CallbackQueryHandler(button))
 
     # تشغيل البوت
-    await updater.start_polling()
-    await updater.idle()
+    updater.start_polling()
+    updater.idle()
 
 if __name__ == '__main__':
-    asyncio.run(main())
+    main()
