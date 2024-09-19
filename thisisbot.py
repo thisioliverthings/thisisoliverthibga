@@ -2,8 +2,8 @@ import logging
 import random
 import json
 import os
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext
+from telegram.ext import Updater, CommandHandler, CallbackContext, MessageHandler, Filters
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 
 # إعداد الـ Token الخاص بالبوت
 API_TOKEN = '7328823780:AAGgppB9_38ParQ2mdurprSFusMM97e1LAM'
