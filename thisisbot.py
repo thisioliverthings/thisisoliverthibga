@@ -218,4 +218,4 @@ def main() -> None:
             f.write(f"{datetime.now()}: {e}\n")
 
 if __name__ == '__main__':
-    main()r(Filters.text & ~Filters.command, handle_message
+    main()
