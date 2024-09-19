@@ -7,7 +7,8 @@ from nltk.sentiment import SentimentIntensityAnalyzer
 import os
 import nltk
 nltk.download('vader_lexicon')
-
+import nltk
+nltk.download('punkt_tab')
 API_TOKEN = '7328823780:AAGgppB9_38ParQ2mdurprSFusMM97e1LAM'
 bot = telebot.TeleBot(API_TOKEN)
 
