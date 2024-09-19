@@ -5,7 +5,6 @@ import os
 import redis.asyncio as redis
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters
-from telegram.error import NetworkError, Unauthorized, InvalidToken
 
 # إعداد الـ Token الخاص بالبوت
 API_TOKEN = '8119443898:AAFwm5E368v-Ov-M_XGBQYCJxj1vMDQbv-0'
