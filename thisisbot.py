@@ -45,6 +45,115 @@ def send_reminder(update: Update, context: CallbackContext, message: str):
 def schedule_reminder(chat_id: int, message: str, delay: int):
     Timer(delay, send_reminder, args=(chat_id, message)).start()
 
+# التعامل مع الرسائل العامة
+def handle_message(update: Update, context: CallbackContext) -> None:
+    user_id = update.message.from_user.id
+    user_text = update.message.text.strip().lower()
+    user_language = user_data.get(user_id, {}).get('language', 'العربية')
+
+    # تقديم الدعم باللغتين
+    if user_language == 'العربية':
+        responses = {
+            "رصيدي": "رصيدك الحالي: {balance}",
+            "سحب": "لقد قمت بسحب {amount}!",
+            "إيداع": "لقد قمت بإيداع {amount}!",
+            "شكرًا": "على الرحب والسعة! هل تحتاج إلى مساعدة أخرى؟",
+            "تغيير اللغة": "اختر لغتك:",
+            "مساعدة": "للحصول على المساعدة، يرجى اتباع الأوامر التالية:"
+        }
+    else:
+        responses = {
+            "my balance": "Your current balance is: {balance}",
+            "withdraw": "You have withdrawn {amount}!",
+            "deposit": "You have deposited {amount}!",
+            "thank you": "You're welcome! Do you need any more help?",
+            "change language": "Choose your language:",
+            "help": "To get help, please follow these commands:"
+        }
+
+    if "رصيدي" in user_text:
+        balance = user_data.get(user_id, {}).get('balance', 0)
+        response_message = responses["رصيدي"].format(balance=balance)
+        context.bot.send_message(chat_id=update.message.chat_id, text=response_message)
+
+    elif user_text.startswith("سحب"):
+        try:
+            amount = int(user_text.split()[1])
+            if user_data.get(user_id, {}).get('balance', 0) >= amount:
+                user_data[user_id]['balance'] -= amount
+                save_user_data()
+                response_message = responses["سحب"].format(amount=amount)
+                context.bot.send_message(chat_id=update.message.chat_id, text=response_message)
+            else:
+                context.bot.send_message(chat_id=update.message.chat_id, text="رصيدك غير كافٍ.")
+        except (IndexError, ValueError):
+            context.bot.send_message(chat_id=update.message.chat_id, text="يرجى تحديد المبلغ بشكل صحيح.")
+
+    elif user_text.startswith("إيداع"):
+        try:
+            amount = int(user_text.split()[1])
+            user_data[user_id]['balance'] += amount
+            save_user_data()
+            response_message = responses["إيداع"].format(amount=amount)
+            context.bot.send_message(chat_id=update.message.chat_id, text=response_message)
+        except (IndexError, ValueError):
+            context.bot.send_message(chat_id=update.message.chat_id, text="يرجى تحديد المبلغ بشكل صحيح.")
+
+    elif "شكرًا" in user_text:
+        context.bot.send_message(chat_id=update.message.chat_id, text=responses["شكرًا"])
+
+    elif "تغيير اللغة" in user_text:
+        change_language(update, context)
+
+    elif "مساعدة" in user_text:
+        help_command(update, context)
+
+    else:
+        context.bot.send_message(chat_id=update.message.chat_id, text="لم أفهم طلبك. حاول مرة أخرى.")
+
+# دالة عرض المساعدة
+def help_command(update: Update, context: CallbackContext) -> None:
+    keyboard = [
+        [InlineKeyboardButton("القسم 1: الأوامر الأساسية", callback_data='help_section_1')],
+        [InlineKeyboardButton("القسم 2: نظام النقاط", callback_data='help_section_2')],
+        [InlineKeyboardButton("القسم 3: إدارة اللغة", callback_data='help_section_3')]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    update.message.reply_text(
+        "مرحبًا! اختر قسمًا لعرض الشرح:",
+        reply_markup=reply_markup
+    )
+
+# دالة للتعامل مع أزرار الشرح
+def button(update: Update, context: CallbackContext) -> None:
+    query = update.callback_query
+    user_id = query.from_user.id
+
+    help_texts = {
+        'help_section_1': (
+            "📜 **الأوامر الأساسية:**\n"
+            "1. **بدء:** اكتب 'start' - لبدء التفاعل مع البوت.\n"
+            "2. **تغيير اللغة:** اكتب 'change language' - لتغيير لغة البوت.\n"
+            "3. **مساعدة:** اكتب 'help' - لعرض تعليمات الاستخدام."
+        ),
+        'help_section_2': (
+            "📊 **نظام النقاط:**\n"
+            "1. **رصيدك:** اكتب 'رصيدي' لمعرفة رصيدك الحالي.\n"
+            "2. **إيداع:** اكتب 'إيداع [المبلغ]' لإيداع المال في رصيدك.\n"
+            "3. **سحب:** اكتب 'سحب [المبلغ]' لسحب المال من رصيدك."
+        ),
+        'help_section_3': (
+            "🌐 **إدارة اللغة:**\n"
+            "1. **اختيار اللغة:** عند بدء التفاعل مع البوت، يمكنك اختيار لغتك.\n"
+            "2. **تغيير اللغة:** اكتب 'تغيير اللغة' لتغيير اللغة لاحقًا."
+        )
+    }
+
+    response_message = help_texts.get(query.data, "قسم غير معروف.")
+    query.answer()
+    query.edit_message_text(text=response_message)
+
 # التعامل مع الأمر /start
 def start(update: Update, context: CallbackContext) -> None:
     user_id = update.message.from_user.id
@@ -75,98 +184,7 @@ def change_language(update: Update, context: CallbackContext) -> None:
         reply_markup=reply_markup
     )
 
-# دالة عرض المساعدة
-def help_command(update: Update, context: CallbackContext) -> None:
-    keyboard = [
-        [InlineKeyboardButton("القسم 1: الأوامر الأساسية", callback_data='help_section_1')],
-        [InlineKeyboardButton("القسم 2: نظام النقاط", callback_data='help_section_2')],
-        [InlineKeyboardButton("القسم 3: إدارة اللغة", callback_data='help_section_3')]
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-
-    update.message.reply_text(
-        "مرحبًا! اختر قسمًا لعرض الشرح:",
-        reply_markup=reply_markup
-    )
-
-# دالة للتعامل مع أزرار الشرح
-def button(update: Update, context: CallbackContext) -> None:
-    query = update.callback_query
-    user_id = query.from_user.id
-
-    help_texts = {
-        'help_section_1': (
-            "📜 **الأوامر الأساسية:**\n"
-            "1. **بدء:** /start - لبدء التفاعل مع البوت.\n"
-            "2. **تغيير اللغة:** /غير_اللغة - لتغيير لغة البوت.\n"
-            "3. **مساعدة:** /help - لعرض تعليمات الاستخدام."
-        ),
-        'help_section_2': (
-            "📊 **نظام النقاط:**\n"
-            "1. **رصيدك:** اكتب 'رصيدي' لمعرفة رصيدك الحالي.\n"
-            "2. **إيداع:** اكتب 'إيداع [المبلغ]' لإيداع المال في رصيدك.\n"
-            "3. **سحب:** اكتب 'سحب [المبلغ]' لسحب المال من رصيدك."
-        ),
-        'help_section_3': (
-            "🌐 **إدارة اللغة:**\n"
-            "1. **اختيار اللغة:** عند بدء التفاعل مع البوت، يمكنك اختيار لغتك.\n"
-            "2. **تغيير اللغة:** استخدم الأمر '/غير_اللغة' لتغيير اللغة لاحقًا."
-        )
-    }
-
-    response_message = help_texts.get(query.data, "قسم غير معروف.")
-    query.answer()
-    query.edit_message_text(text=response_message)
-
-# التعامل مع الرسائل العامة
-def handle_message(update: Update, context: CallbackContext) -> None:
-    user_id = update.message.from_user.id
-    user_text = update.message.text.strip().lower()
-    user_language = user_data.get(user_id, {}).get('language', 'العربية')
-
-    # تقديم الدعم باللغتين
-    if user_language == 'العربية':
-        responses = {
-            "balance": "رصيدك الحالي: {balance}",
-            "reward": "لقد حصلت على مكافأة قدرها {amount}!",
-            "thank_you": "على الرحب والسعة! هل تحتاج إلى مساعدة أخرى؟",
-        }
-    else:
-        responses = {
-            "balance": "Your current balance is: {balance}",
-            "reward": "You have earned a reward of {amount}!",
-            "thank_you": "You're welcome! Do you need any more help?",
-        }
-
-    if user_text == "رصيدي":
-        balance = user_data.get(user_id, {}).get('balance', 0)
-        response_message = responses["balance"].format(balance=balance)
-        context.bot.send_message(chat_id=update.message.chat_id, text=response_message)
-
-    elif user_text.startswith("سحب"):
-        amount = int(user_text.split()[1])
-        if user_data.get(user_id, {}).get('balance', 0) >= amount:
-            user_data[user_id]['balance'] -= amount
-            save_user_data()
-            response_message = responses["reward"].format(amount=amount)
-            context.bot.send_message(chat_id=update.message.chat_id, text=response_message)
-        else:
-            context.bot.send_message(chat_id=update.message.chat_id, text="رصيدك غير كافٍ.")
-
-    elif user_text.startswith("إيداع"):
-        amount = int(user_text.split()[1])
-        user_data[user_id]['balance'] += amount
-        save_user_data()
-        response_message = responses["reward"].format(amount=amount)
-        context.bot.send_message(chat_id=update.message.chat_id, text=response_message)
-
-    elif "شكرًا" in user_text:
-        context.bot.send_message(chat_id=update.message.chat_id, text=responses["thank_you"])
-
-    else:
-        context.bot.send_message(chat_id=update.message.chat_id, text="لم أفهم طلبك. حاول مرة أخرى.")
-
-# الدالة لإرسال إشعار للمالك عند حدوث خطأ
+# دالة لإرسال إشعار للمالك عند حدوث خطأ
 def notify_owner(message, context):
     context.bot.send_message(chat_id=OWNER_CHAT_ID, text=f"Error occurred: {message}")
 
@@ -176,15 +194,5 @@ def main() -> None:
     dispatcher = updater.dispatcher
 
     # تسجيل الأوامر المختلفة
-    dispatcher.add_handler(CommandHandler("start", start))
-    dispatcher.add_handler(CommandHandler("غير_اللغة", change_language))
-    dispatcher.add_handler(CommandHandler("help", help_command))
     dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, handle_message))
-    dispatcher.add_handler(CallbackQueryHandler(button))
-
-    # تشغيل البوت
-    updater.start_polling()
-    updater.idle()
-
-if __name__ == '__main__':
-    main()
+    dispatcher
