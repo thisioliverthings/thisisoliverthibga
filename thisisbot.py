@@ -1,3 +1,4 @@
+# إعداد الـ Token الخاص بالبوت
 import logging
 import random
 import json
@@ -7,90 +8,37 @@ from telegram.ext import Updater, CommandHandler, CallbackContext, MessageHandle
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.error import NetworkError, Unauthorized, InvalidToken
 
-# إعداد الـ Token الخاص بالبوت
 API_TOKEN = '8119443898:AAFwm5E368v-Ov-M_XGBQYCJxj1vMDQbv-0'
-OWNER_CHAT_ID = 'your_owner_chat_id'  # ضع رقم دردشة المالك هنا
+OWNER_CHAT_ID = '7161132306'  # ضع رقم دردشة المالك هنا
 
-# تفعيل نظام التسجيل لمراقبة الأخطاء
-error_log_file = "error_log.txt"
-logging.basicConfig(
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    level=logging.INFO,
-    handlers=[
-        logging.FileHandler(error_log_file),
-        logging.StreamHandler()
-    ]
-)
+# إعداد تسجيل الأخطاء
+logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+                    level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 DB_FILE = "user_data.json"
-CHALLENGE_FILE = "challenges.json"
-
-# تحميل بيانات المستخدمين
 if os.path.exists(DB_FILE):
     with open(DB_FILE, "r") as f:
         user_data = json.load(f)
 else:
     user_data = {}
 
-# تحميل تحديات
-if os.path.exists(CHALLENGE_FILE):
-    with open(CHALLENGE_FILE, "r") as f:
-        challenges = json.load(f)
-else:
-    challenges = {
-        "daily": ["Solve the riddle: What has keys but can't open locks?", "Guess the number between 1 and 10."],
-        "weekly": ["Write a funny story using the words 'dog', 'moon', and 'robot'.", "Create a meme about programming."]
-    }
-
 # حفظ بيانات المستخدمين
 def save_user_data():
     with open(DB_FILE, "w") as f:
         json.dump(user_data, f)
 
-# حفظ التحديات
-def save_challenges():
-    with open(CHALLENGE_FILE, "w") as f:
-        json.dump(challenges, f)
+# دالة للتحقق من وجود مستخدم في قاعدة البيانات
+def get_user(user_id):
+    if user_id not in user_data:
+        user_data[user_id] = {
+            'balance': 100,  # رصيد افتراضي أولي
+            'completed_challenges': [],
+        }
+        save_user_data()
+    return user_data[user_id]
 
-# دالة إرسال التحدي
-def send_challenge(update: Update, context: CallbackContext, challenge_type: str):
-    chat_id = update.message.chat_id
-    if challenge_type in challenges:
-        challenge = random.choice(challenges[challenge_type])
-        context.bot.send_message(chat_id=chat_id, text=f"Today's challenge is: {challenge}")
-    else:
-        context.bot.send_message(chat_id=chat_id, text="No challenges available at the moment.")
-
-# التعامل مع الأمر /start
-def start(update: Update, context: CallbackContext) -> None:
-    update.message.reply_text("Welcome to the Challenge Bot! Use /challenge to get a challenge.")
-
-# التعامل مع الأمر /help
-def help_command(update: Update, context: CallbackContext) -> None:
-    keyboard = [
-        [InlineKeyboardButton("المالك للإبلاغ عن مشكلة", url="https://t.me/oliceer")]  # ضع الرابط الخاص بك هنا
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    update.message.reply_text(
-        """👋 مرحبا بك في بوت التحديات!
-
-🌟 مميزات البوت:
-- تحديات يومية وأسبوعية: استخدم /challenge للحصول على التحديات.
-- نظام النقاط: احصل على نقاط عند إكمال التحديات.
-- تفاعل معنا وأكمل التحديات للحصول على المزيد من النقاط!""",
-        reply_markup=reply_markup
-    )
-
-# التعامل مع الأمر /challenge
-def challenge(update: Update, context: CallbackContext) -> None:
-    send_challenge(update, context, 'daily')
-
-# الدالة لإرسال إشعار للمالك عند حدوث خطأ
-def notify_owner(message, context):
-    context.bot.send_message(chat_id=7161132306, text=f"Error occurred: {message}")
-
-# دالة إعادة المحاولة التلقائية
+# إضافة دالة إعادة المحاولة التلقائية
 def retry_after_delay(func, max_retries=5):
     retries = 0
     while retries < max_retries:
@@ -99,61 +47,52 @@ def retry_after_delay(func, max_retries=5):
             break
         except NetworkError as e:
             retries += 1
-            wait_time = 2 ** retries  # Exponential backoff
-            logger.error(f"NetworkError: {e}. Retrying in {wait_time} seconds...")
+            wait_time = 2 ** retries  # مضاعفة وقت الانتظار بعد كل محاولة
+            logger.error(f"NetworkError: {e}. إعادة المحاولة بعد {wait_time} ثانية...")
             time.sleep(wait_time)
+        except Unauthorized as e:
+            logger.error(f"Unauthorized: {e}. لا يمكن إكمال العملية.")
+            break
+        except InvalidToken as e:
+            logger.error(f"InvalidToken: {e}. تحقق من صحة الـ Token.")
+            break
+
+# دالة لإشعار المالك عند حدوث خطأ
+def notify_owner(message, context):
+    context.bot.send_message(chat_id=OWNER_CHAT_ID, text=f"Error occurred: {message}")
+
+# أمر لعرض الرصيد
+def balance(update: Update, context: CallbackContext) -> None:
+    user_id = update.message.from_user.id
+    user = get_user(user_id)
+    update.message.reply_text(f"💰 رصيدك الحالي: {user['balance']} عملة.")
+
+# أمر لجمع العملات
+def earn(update: Update, context: CallbackContext) -> None:
+    user_id = update.message.from_user.id
+    user = get_user(user_id)
+    earned_amount = random.randint(10, 50)
+    user['balance'] += earned_amount
+    save_user_data()
+    update.message.reply_text(f"🎉 لقد حصلت على {earned_amount} عملة! رصيدك الحالي هو {user['balance']}.")
+
+# أمر لبدء البوت
+def start(update: Update, context: CallbackContext) -> None:
+    update.message.reply_text("مرحبًا بك في بوت الاقتصاد! استخدم /balance لمعرفة رصيدك و/earn لجمع العملات.")
+
+# أمر المساعدة
+def help_command(update: Update, context: CallbackContext) -> None:
+    update.message.reply_text("""
+أوامر البوت المتاحة:
+- /balance: لمعرفة رصيدك.
+- /earn: لجمع العملات.
+- /challenge: للحصول على تحديات.
+    """)
 
 # التعامل مع الرسائل العامة
 def handle_message(update: Update, context: CallbackContext) -> None:
-    chat_id = update.message.chat_id
-    user_id = update.message.from_user.id
-    user_text = update.message.text.strip().lower()
-
-    # إذا لم يكن المستخدم موجودًا في قاعدة البيانات
-    if user_id not in user_data:
-        user_data[user_id] = {
-            'points': 0,
-            'completed_challenges': [],
-            'active_challenge': None
-        }
-        save_user_data()
-
     try:
-        # معالجة التحديات النشطة
-        if user_data[user_id]['active_challenge']:
-            active_challenge = user_data[user_id]['active_challenge']
-            expected_answer = active_challenge['answer'].strip().lower()
-
-            if user_text == expected_answer:
-                user_data[user_id]['points'] += 10
-                user_data[user_id]['completed_challenges'].append(active_challenge['question'])
-                user_data[user_id]['active_challenge'] = None
-                save_user_data()
-                response_message = "إجابة صحيحة! لقد حصلت على 10 نقاط."
-            else:
-                response_message = "الإجابة غير صحيحة. حاول مرة أخرى!"
-
-            context.bot.send_message(chat_id=chat_id, text=response_message)
-
-        # التعامل مع العبارات المتعلقة بإكمال التحديات
-        elif "challenge completed" in user_text:
-            if user_data[user_id]['completed_challenges']:
-                user_data[user_id]['points'] += 10
-                save_user_data()
-                response_message = "تهانينا! لقد حصلت على 10 نقاط إضافية."
-            else:
-                response_message = "لم تقم بإكمال أي تحديات بعد."
-
-            context.bot.send_message(chat_id=chat_id, text=response_message)
-
-        # تعامل مع عبارات الشكر
-        elif "thank you" in user_text:
-            context.bot.send_message(chat_id=chat_id, text="على الرحب والسعة! هل ترغب في المزيد من التحديات؟")
-
-        # توفير رسالة افتراضية للرسائل غير المعروفة
-        else:
-            context.bot.send_message(chat_id=chat_id, text="آسف، لم أفهم طلبك. يرجى استخدام الأوامر المتاحة مثل /challenge للحصول على التحديات.")
-
+        update.message.reply_text("يرجى استخدام الأوامر المتاحة مثل /balance و/earn.")
     except (NetworkError, Unauthorized, InvalidToken) as e:
         logger.error(f"Exception occurred: {e}")
         notify_owner(f"Exception occurred: {e}", context)
@@ -163,16 +102,19 @@ def main() -> None:
     updater = Updater(API_TOKEN)
     dispatcher = updater.dispatcher
 
-    # تسجيل الأوامر المختلفة
+    # أوامر البوت
     dispatcher.add_handler(CommandHandler("start", start))
     dispatcher.add_handler(CommandHandler("help", help_command))
-    dispatcher.add_handler(CommandHandler("challenge", challenge))
+    dispatcher.add_handler(CommandHandler("balance", balance))
+    dispatcher.add_handler(CommandHandler("earn", earn))
 
-    # تسجيل الرسائل العامة
+    # التعامل مع الرسائل العامة
     dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, handle_message))
 
-    # تشغيل البوت
-    updater.start_polling()
+    # تشغيل البوت مع إعادة المحاولة عند فشل الاتصال
+    retry_after_delay(updater.start_polling)
+
+    # الحفاظ على البوت في وضع التشغيل
     updater.idle()
 
 if __name__ == '__main__':
