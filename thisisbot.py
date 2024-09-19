@@ -3,8 +3,8 @@ import random
 import json
 import os
 import asyncio
-import aioredis  # مكتبة Redis غير المتزامنة
-from aiohttp import ClientSession  # مكتبة HTTP غير المتزامنة
+import redis.asyncio as redis  # استخدام redis-py بدلاً من aioredis
+from aiohttp import ClientSession
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters
 from telegram.error import NetworkError, Unauthorized, InvalidToken
@@ -20,15 +20,15 @@ logger = logging.getLogger(__name__)
 
 # إعداد Redis
 REDIS_URL = 'redis://localhost'
-redis = aioredis.from_url(REDIS_URL, decode_responses=True)
+redis_client = redis.from_url(REDIS_URL, decode_responses=True)
 
 # دالة لحفظ البيانات في Redis
 async def save_user_data(user_id, data):
-    await redis.hmset_dict(f"user:{user_id}", data)
+    await redis_client.hset(f"user:{user_id}", mapping=data)
 
 # دالة لاسترجاع البيانات من Redis
 async def get_user_data(user_id):
-    user_data = await redis.hgetall(f"user:{user_id}")
+    user_data = await redis_client.hgetall(f"user:{user_id}")
     if not user_data:
         user_data = {
             'balance': 100,  # رصيد افتراضي أولي
