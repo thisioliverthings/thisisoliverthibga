@@ -7,7 +7,7 @@ from telegram.ext import Updater, CommandHandler, CallbackContext, MessageHandle
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 
 # إعداد الـ Token الخاص بالبوت
-API_TOKEN = 'YOUR_API_TOKEN'
+API_TOKEN = '7328823780:AAGgppB9_38ParQ2mdurprSFusMM97e1LAM'
 
 # تفعيل نظام التسجيل لمراقبة الأخطاء
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
