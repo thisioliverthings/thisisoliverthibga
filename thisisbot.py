@@ -1,7 +1,5 @@
 import logging
 import random
-import json
-import os
 import redis.asyncio as redis
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters
@@ -97,4 +95,9 @@ async def main() -> None:
 
 if __name__ == '__main__':
     import asyncio
-    asyncio.run(main())
+    loop = asyncio.get_event_loop()
+    try:
+        loop.run_until_complete(main())
+    finally:
+        loop.run_until_complete(loop.shutdown_asyncgens())
+        loop.close()
