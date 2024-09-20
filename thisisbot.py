@@ -3,7 +3,7 @@ import sqlite3
 from contextlib import closing
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import Updater, CommandHandler, CallbackContext, MessageHandler, Filters, CallbackQueryHandler
-import random
+import uuid
 
 # إعداد الـ Token الخاص بالبوت
 API_TOKEN = '8119443898:AAFwm5E368v-Ov-M_XGBQYCJxj1vMDQbv-0'
@@ -24,13 +24,13 @@ def init_db():
                 user_id INTEGER PRIMARY KEY,
                 language TEXT DEFAULT 'العربية',
                 balance REAL DEFAULT 0,
-                account_number TEXT UNIQUE
+                account_number TEXT
             )
         ''')
         conn.commit()
 
 def generate_account_number():
-    return str(random.randint(1000000000, 9999999999))  # رقم حساب مكون من 10 أرقام
+    return str(uuid.uuid4())  # استخدام UUID كرقم حساب فريد
 
 def save_user_data(user_id, language, balance, account_number):
     with closing(sqlite3.connect(DATABASE_FILE)) as conn:
@@ -46,14 +46,11 @@ def load_user_data(user_id):
         cursor = conn.cursor()
         cursor.execute('SELECT language, balance, account_number FROM users WHERE user_id = ?', (user_id,))
         data = cursor.fetchone()
-    return data if data else ('العربية', 0, None)
+    return data if data else ('العربية', 0, generate_account_number())  # إنشاء رقم الحساب إذا لم يكن موجودًا
 
 def handle_message(update: Update, context: CallbackContext) -> None:
     user_id = update.effective_user.id
     language, balance, account_number = load_user_data(user_id)
-    if account_number is None:  # إذا لم يكن هناك رقم حساب، قم بإنشائه
-        account_number = generate_account_number()
-        save_user_data(user_id, language, balance, account_number)
     context.bot.send_message(chat_id=update.message.chat_id, text="🎉 مرحبًا بك في بوتنا الرائع! استخدم الأمر 'help' لمساعدتك.")
 
 def help_command(update: Update, context: CallbackContext) -> None:
@@ -63,7 +60,6 @@ def help_command(update: Update, context: CallbackContext) -> None:
         [InlineKeyboardButton("🌍 القسم 3: إدارة اللغة", callback_data='help_section_3')],
         [InlineKeyboardButton("🎟️ القسم 4: العضويات", callback_data='help_section_4')],
         [InlineKeyboardButton("🎁 القسم 5: العروض والمكافآت", callback_data='help_section_5')],
-        [InlineKeyboardButton("🔍 حسابي", callback_data='account_info')],
         [InlineKeyboardButton("🔙 رجوع", callback_data='help_menu')]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -76,16 +72,9 @@ def button(update: Update, context: CallbackContext) -> None:
         'help_section_2': "📊 <b>نظام النقاط والمحفظة:</b><br><ul><li>1️⃣ <b>رصيدك:</b> اكتب '<code>رصيدي</code>' لعرض رصيدك.</li> ... </ul>",
         'help_section_3': "🌐 <b>إدارة اللغة:</b><br><ul><li>1️⃣ <b>اختيار اللغة:</b> اختر لغتك عند بدء التفاعل.</li> ... </ul>",
         'help_section_4': "💼 <b>العضويات والاشتراكات:</b><br><ul><li>1️⃣ <b>الترقية:</b> اكتب '<code>ترقية [نوع العضوية]</code>' لترقية حسابك.</li> ... </ul>",
-        'help_section_5': "🎁 <b>عروض ومكافآت خاصة:</b><br><ul><li>1️⃣ <b>العروض:</b> اكتب '<code>العروض</code>' لعرض العروض الحالية المتاحة لك.</li> ... </ul>",
-        'account_info': "ℹ️ <b>معلومات حسابك:</b><br>رقم حسابك هو: <code>{}</code><br>رصيدك الحالي هو: <code>{}</code><br>اللغة المستخدمة هي: <code>{}</code>"
+        'help_section_5': "🎁 <b>عروض ومكافآت خاصة:</b><br><ul><li>1️⃣ <b>العروض:</b> اكتب '<code>العروض</code>' لعرض العروض الحالية المتاحة لك.</li> ... </ul>"
     }
-    
     help_text = help_texts.get(query.data)
-    if query.data == 'account_info':
-        user_id = query.from_user.id
-        language, balance, account_number = load_user_data(user_id)
-        help_text = help_texts['account_info'].format(account_number, balance, language)
-    
     if help_text:
         reply_markup = InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data='help_menu')]])
         query.edit_message_text(text=help_text, parse_mode='HTML', reply_markup=reply_markup)
@@ -102,6 +91,8 @@ def handle_commands(update: Update, context: CallbackContext) -> None:
             handle_message(update, context)
         elif command == 'help':
             help_command(update, context)
+        elif command == 'حسابي':
+            update.message.reply_text(f"📊 معلومات حسابك:\n- اللغة: {language}\n- الرصيد: {balance}\n- رقم الحساب: {account_number}")
         elif command == 'تغيير اللغة':
             update.message.reply_text("⚙️ يرجى تحديد اللغة الجديدة.")
         elif command == 'settings':
