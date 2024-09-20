@@ -117,7 +117,8 @@ def help_command(update: Update, context: CallbackContext) -> None:
 
 # دالة للتعامل مع أزرار الشرح
 def button(update: Update, context: CallbackContext) -> None:
-    query = update.callback_query
+    query = update.callback_query  # تأكد من تعريف query هنا
+    user_id = query.from_user.id
 
     help_texts = {
         'help_section_1': (
@@ -140,8 +141,8 @@ def button(update: Update, context: CallbackContext) -> None:
     }
 
     response_message = help_texts.get(query.data, "قسم غير معروف.")
-query.answer()
-query.edit_message_text(text=response_message, parse_mode='MarkdownV2')
+    query.answer()
+    query.edit_message_text(text=response_message, parse_mode='Markdown')
 
 # التعامل مع الأمر /start
 def start(update: Update, context: CallbackContext) -> None:
