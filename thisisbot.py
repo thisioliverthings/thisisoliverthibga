@@ -3,8 +3,7 @@ import json
 import os
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import Updater, CommandHandler, CallbackContext, MessageHandler, Filters, CallbackQueryHandler
-from datetime import datetime, timedelta
-from threading import Timer
+from datetime import datetime
 
 # إعداد الـ Token الخاص بالبوت
 API_TOKEN = '8119443898:AAFwm5E368v-Ov-M_XGBQYCJxj1vMDQbv-0'
@@ -36,32 +35,23 @@ def save_user_data():
     with open(DB_FILE, "w") as f:
         json.dump(user_data, f)
 
-# دالة لإرسال إشعارات تذكيرية
-def send_reminder(update: Update, context: CallbackContext, message: str):
-    context.bot.send_message(chat_id=update.message.chat_id, text=message)
-
-# التذكير بالمواعيد
-def schedule_reminder(chat_id: int, message: str, delay: int):
-    Timer(delay, send_reminder, args=(chat_id, message)).start()
-
 # التعامل مع الرسائل العامة
 def handle_message(update: Update, context: CallbackContext) -> None:
     user_id = update.message.from_user.id
     user_text = update.message.text.strip().lower()
+
     user_language = user_data.get(user_id, {}).get('language', 'العربية')
 
-    # تقديم الدعم باللغتين
-    if user_language == 'العربية':
-        responses = {
+    responses = {
+        "العربية": {
             "رصيدي": "رصيدك الحالي: {balance}",
             "سحب": "لقد قمت بسحب {amount}!",
             "إيداع": "لقد قمت بإيداع {amount}!",
             "شكرًا": "على الرحب والسعة! هل تحتاج إلى مساعدة أخرى؟",
             "تغيير اللغة": "اختر لغتك:",
             "مساعدة": "للحصول على المساعدة، يرجى اتباع الأوامر التالية:"
-        }
-    else:
-        responses = {
+        },
+        "English": {
             "my balance": "Your current balance is: {balance}",
             "withdraw": "You have withdrawn {amount}!",
             "deposit": "You have deposited {amount}!",
@@ -69,10 +59,11 @@ def handle_message(update: Update, context: CallbackContext) -> None:
             "change language": "Choose your language:",
             "help": "To get help, please follow these commands:"
         }
+    }
 
     if "رصيدي" in user_text:
         balance = user_data.get(user_id, {}).get('balance', 0)
-        response_message = responses["رصيدي"].format(balance=balance)
+        response_message = responses[user_language]["رصيدي"].format(balance=balance)
         context.bot.send_message(chat_id=update.message.chat_id, text=response_message)
 
     elif user_text.startswith("سحب"):
@@ -81,7 +72,7 @@ def handle_message(update: Update, context: CallbackContext) -> None:
             if user_data.get(user_id, {}).get('balance', 0) >= amount:
                 user_data[user_id]['balance'] -= amount
                 save_user_data()
-                response_message = responses["سحب"].format(amount=amount)
+                response_message = responses[user_language]["سحب"].format(amount=amount)
                 context.bot.send_message(chat_id=update.message.chat_id, text=response_message)
             else:
                 context.bot.send_message(chat_id=update.message.chat_id, text="رصيدك غير كافٍ.")
@@ -93,13 +84,13 @@ def handle_message(update: Update, context: CallbackContext) -> None:
             amount = int(user_text.split()[1])
             user_data[user_id]['balance'] += amount
             save_user_data()
-            response_message = responses["إيداع"].format(amount=amount)
+            response_message = responses[user_language]["إيداع"].format(amount=amount)
             context.bot.send_message(chat_id=update.message.chat_id, text=response_message)
         except (IndexError, ValueError):
             context.bot.send_message(chat_id=update.message.chat_id, text="يرجى تحديد المبلغ بشكل صحيح.")
 
     elif "شكرًا" in user_text:
-        context.bot.send_message(chat_id=update.message.chat_id, text=responses["شكرًا"])
+        context.bot.send_message(chat_id=update.message.chat_id, text=responses[user_language]["شكرًا"])
 
     elif "تغيير اللغة" in user_text:
         change_language(update, context)
@@ -127,7 +118,6 @@ def help_command(update: Update, context: CallbackContext) -> None:
 # دالة للتعامل مع أزرار الشرح
 def button(update: Update, context: CallbackContext) -> None:
     query = update.callback_query
-    user_id = query.from_user.id
 
     help_texts = {
         'help_section_1': (
@@ -175,6 +165,7 @@ def set_language(update: Update, context: CallbackContext) -> None:
     query = update.callback_query
     user_id = query.from_user.id
     language = 'العربية' if query.data == 'set_language_ar' else 'English'
+
     user_data.setdefault(user_id, {})['language'] = language
     save_user_data()
 
@@ -182,6 +173,8 @@ def set_language(update: Update, context: CallbackContext) -> None:
         chat_id=user_id,
         text=f"تم تغيير اللغة إلى: {language}"
     )
+
+    query.answer()  # تأكيد الضغط على الزر
 
 # التعامل مع الأمر /change_language
 def change_language(update: Update, context: CallbackContext) -> None:
@@ -212,7 +205,7 @@ def main() -> None:
     try:
         updater.start_polling()
         updater.idle()
-    except (NetworkError, Unauthorized, InvalidToken) as e:
+    except Exception as e:
         logger.error(f"Error starting the bot: {e}")
         with open(error_log_file, "a") as f:
             f.write(f"{datetime.now()}: {e}\n")
