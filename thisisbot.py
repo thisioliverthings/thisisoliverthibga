@@ -125,31 +125,27 @@ def button(update: Update, context: CallbackContext) -> None:
             "📜 *الأوامر الأساسية:*\n"
             "1. *بدء:* اكتب 'start' - لبدء التفاعل مع البوت.\n"
             "2. *تغيير اللغة:* اكتب 'change language' - لتغيير لغة البوت.\n"
-            "3. *مساعدة:* اكتب 'help' - لعرض تعليمات الاستخدام."
+            "3. *مساعدة:* اكتب 'help' - لعرض تعليمات الاستخدام.\n"
+            "◀️ [رجوع](/help)"
         ),
         'help_section_2': (
             "📊 *نظام النقاط:*\n"
             "1. *رصيدك:* اكتب 'رصيدي' لمعرفة رصيدك الحالي.\n"
             "2. *إيداع:* اكتب 'إيداع [المبلغ]' لإيداع المال في رصيدك.\n"
-            "3. *سحب:* اكتب 'سحب [المبلغ]' لسحب المال من رصيدك."
+            "3. *سحب:* اكتب 'سحب [المبلغ]' لسحب المال من رصيدك.\n"
+            "◀️ [رجوع](/help)"
         ),
         'help_section_3': (
             "🌐 *إدارة اللغة:*\n"
             "1. *اختيار اللغة:* عند بدء التفاعل مع البوت، يمكنك اختيار لغتك.\n"
-            "2. *تغيير اللغة:* اكتب 'تغيير اللغة' لتغيير اللغة لاحقًا."
+            "2. *تغيير اللغة:* اكتب 'تغيير اللغة' لتغيير اللغة لاحقًا.\n"
+            "◀️ [رجوع](/help)"
         )
     }
 
     response_message = help_texts.get(query.data, "قسم غير معروف.")
-    keyboard = [[InlineKeyboardButton("رجوع", callback_data='help_main')]]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-
     query.answer()
-    query.edit_message_text(text=response_message, reply_markup=reply_markup, parse_mode='MarkdownV2')
-
-# العودة إلى قسم المساعدة الرئيسي
-def back_to_help_main(update: Update, context: CallbackContext) -> None:
-    help_command(update, context)
+    query.edit_message_text(text=response_message, parse_mode='MarkdownV2')
 
 # التعامل مع الأمر /start
 def start(update: Update, context: CallbackContext) -> None:
@@ -212,7 +208,6 @@ def main() -> None:
     dispatcher.add_handler(CommandHandler('start', start))
     dispatcher.add_handler(CommandHandler('change_language', change_language))
     dispatcher.add_handler(CallbackQueryHandler(button))
-    dispatcher.add_handler(CallbackQueryHandler(back_to_help_main, pattern='^help_section_.*'))
     dispatcher.add_handler(CallbackQueryHandler(set_language, pattern='^set_language_'))
 
     # تشغيل البوت
@@ -224,5 +219,5 @@ def main() -> None:
         with open(error_log_file, "a") as f:
             f.write(f"{datetime.now()}: {e}\n")
 
-if __name__ == '__main__':
-    main()
+if __name__ == "__main__":
+  main()
