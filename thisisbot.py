@@ -118,7 +118,7 @@ def help_command(update: Update, context: CallbackContext) -> None:
 
 # دالة للتعامل مع أزرار الشرح
 def button(update: Update, context: CallbackContext) -> None:
-    query = update.callback_query
+    query = update.callback_query  # تأكد من تعريف query هنا
     user_id = query.from_user.id
 
     help_texts = {
@@ -138,13 +138,38 @@ def button(update: Update, context: CallbackContext) -> None:
             "🌐 <b>إدارة اللغة:</b>\n"
             "1. <b>اختيار اللغة:</b> عند بدء التفاعل مع البوت، يمكنك اختيار لغتك.\n"
             "2. <b>تغيير اللغة:</b> اكتب 'تغيير اللغة' لتغيير اللغة لاحقًا."
-        ),
-        'back': "رجعت إلى القائمة الرئيسية."
+        )
     }
 
-    response_message = help_texts.get(query.data, "قسم غير معروف.")
+    # التحقق إذا كان المستخدم يريد العودة إلى القائمة الرئيسية
+    if query.data == 'back_to_menu':
+        keyboard = [
+            [InlineKeyboardButton("القسم 1: الأوامر الأساسية", callback_data='help_section_1')],
+            [InlineKeyboardButton("القسم 2: نظام النقاط", callback_data='help_section_2')],
+            [InlineKeyboardButton("القسم 3: إدارة اللغة", callback_data='help_section_3')]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+
+        query.edit_message_text(
+            text="مرحبًا! اختر قسمًا لعرض الشرح:",
+            reply_markup=reply_markup
+        )
+    else:
+        # عرض النصوص بناءً على القسم المختار وإضافة زر "رجوع"
+        response_message = help_texts.get(query.data, "قسم غير معروف.")
+        keyboard = [
+            [InlineKeyboardButton("رجوع", callback_data='back_to_menu')]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+
+        query.edit_message_text(
+            text=response_message,
+            reply_markup=reply_markup,
+            parse_mode='HTML'  # استخدام HTML بدلاً من MarkdownV2
+        )
+
     query.answer()
-    query.edit_message_text(text=response_message, parse_mode='HTML')
+
 
 # التعامل مع الأمر /start
 def start(update: Update, context: CallbackContext) -> None:
