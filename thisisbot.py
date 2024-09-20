@@ -122,27 +122,34 @@ def button(update: Update, context: CallbackContext) -> None:
 
     help_texts = {
         'help_section_1': (
-            "📜 **الأوامر الأساسية:**\n"
-            "1. **بدء:** اكتب 'start' - لبدء التفاعل مع البوت.\n"
-            "2. **تغيير اللغة:** اكتب 'change language' - لتغيير لغة البوت.\n"
-            "3. **مساعدة:** اكتب 'help' - لعرض تعليمات الاستخدام."
+            "📜 *الأوامر الأساسية:*\n"
+            "1. *بدء:* اكتب 'start' - لبدء التفاعل مع البوت.\n"
+            "2. *تغيير اللغة:* اكتب 'change language' - لتغيير لغة البوت.\n"
+            "3. *مساعدة:* اكتب 'help' - لعرض تعليمات الاستخدام."
         ),
         'help_section_2': (
-            "📊 **نظام النقاط:**\n"
-            "1. **رصيدك:** اكتب 'رصيدي' لمعرفة رصيدك الحالي.\n"
-            "2. **إيداع:** اكتب 'إيداع [المبلغ]' لإيداع المال في رصيدك.\n"
-            "3. **سحب:** اكتب 'سحب [المبلغ]' لسحب المال من رصيدك."
+            "📊 *نظام النقاط:*\n"
+            "1. *رصيدك:* اكتب 'رصيدي' لمعرفة رصيدك الحالي.\n"
+            "2. *إيداع:* اكتب 'إيداع [المبلغ]' لإيداع المال في رصيدك.\n"
+            "3. *سحب:* اكتب 'سحب [المبلغ]' لسحب المال من رصيدك."
         ),
         'help_section_3': (
-            "🌐 **إدارة اللغة:**\n"
-            "1. **اختيار اللغة:** عند بدء التفاعل مع البوت، يمكنك اختيار لغتك.\n"
-            "2. **تغيير اللغة:** اكتب 'تغيير اللغة' لتغيير اللغة لاحقًا."
+            "🌐 *إدارة اللغة:*\n"
+            "1. *اختيار اللغة:* عند بدء التفاعل مع البوت، يمكنك اختيار لغتك.\n"
+            "2. *تغيير اللغة:* اكتب 'تغيير اللغة' لتغيير اللغة لاحقًا."
         )
     }
 
     response_message = help_texts.get(query.data, "قسم غير معروف.")
+    keyboard = [[InlineKeyboardButton("رجوع", callback_data='help_main')]]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
     query.answer()
-    query.edit_message_text(text=response_message, parse_mode='Markdown')
+    query.edit_message_text(text=response_message, reply_markup=reply_markup, parse_mode='MarkdownV2')
+
+# العودة إلى قسم المساعدة الرئيسي
+def back_to_help_main(update: Update, context: CallbackContext) -> None:
+    help_command(update, context)
 
 # التعامل مع الأمر /start
 def start(update: Update, context: CallbackContext) -> None:
@@ -175,7 +182,7 @@ def set_language(update: Update, context: CallbackContext) -> None:
     context.bot.send_message(
         chat_id=user_id,
         text=f"تم تغيير اللغة إلى: {language}",
-        parse_mode='Markdown'
+        parse_mode='MarkdownV2'
     )
 
     # عرض قسم المساعدة المناسب بعد تغيير اللغة
@@ -205,6 +212,7 @@ def main() -> None:
     dispatcher.add_handler(CommandHandler('start', start))
     dispatcher.add_handler(CommandHandler('change_language', change_language))
     dispatcher.add_handler(CallbackQueryHandler(button))
+    dispatcher.add_handler(CallbackQueryHandler(back_to_help_main, pattern='^help_section_.*'))
     dispatcher.add_handler(CallbackQueryHandler(set_language, pattern='^set_language_'))
 
     # تشغيل البوت
