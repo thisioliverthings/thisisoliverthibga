@@ -50,11 +50,12 @@ def load_user_data(user_id):
     return data if data else ('العربية', 0)
 
 # التعامل مع الرسائل العامة
-def handle_message(update: Update, context: CallbackContext) -> None:
-    user_id = update.message.from_user.id
-    language, balance = load_user_data(user_id)
-    save_user_data(user_id, language, balance)
-    context.bot.send_message(chat_id=update.message.chat_id, text="🎉 مرحبًا بك في بوتنا الرائع! استخدم الأمر 'help' لمساعدتك.")
+def handle_commands(update: Update, context: CallbackContext) -> None:
+    user_id = update.effective_user.id
+    command = update.message.text
+
+    print(f"Received command from {user_id}: {command}")  # تتبع الأوامر
+ context.bot.send_message(chat_id=update.message.chat_id, text="🎉 مرحبًا بك في بوتنا الرائع! استخدم الأمر 'help' لمساعدتك.")
 
 # دالة عرض المساعدة
 def help_command(update: Update, context: CallbackContext) -> None:
