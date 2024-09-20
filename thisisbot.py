@@ -117,7 +117,7 @@ def help_command(update: Update, context: CallbackContext) -> None:
 
 # دالة للتعامل مع أزرار الشرح
 def button(update: Update, context: CallbackContext) -> None:
-    query = update.callback_query  # تأكد من تعريف query هنا
+    query = update.callback_query
     user_id = query.from_user.id
 
     help_texts = {
@@ -161,7 +161,7 @@ def start(update: Update, context: CallbackContext) -> None:
         reply_markup=reply_markup
     )
 
-# تأكيد تغيير اللغه
+# تأكيد تغيير اللغة
 def set_language(update: Update, context: CallbackContext) -> None:
     query = update.callback_query
     user_id = query.from_user.id
