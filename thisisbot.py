@@ -161,21 +161,26 @@ def start(update: Update, context: CallbackContext) -> None:
         reply_markup=reply_markup
     )
 
-# التعامل مع تغيير اللغة
+# تأكيد تغيير اللغه
 def set_language(update: Update, context: CallbackContext) -> None:
     query = update.callback_query
     user_id = query.from_user.id
     language = 'العربية' if query.data == 'set_language_ar' else 'English'
 
+    # تحديث لغة المستخدم وحفظ البيانات
     user_data.setdefault(user_id, {})['language'] = language
     save_user_data()
 
+    # إرسال رسالة تأكيد
     context.bot.send_message(
         chat_id=user_id,
-        text=f"تم تغيير اللغة إلى: {language}"
+        text=f"تم تغيير اللغة إلى: {language}",
+        parse_mode='Markdown'
     )
 
-    query.answer()  # تأكيد الضغط على الزر
+    # عرض قسم المساعدة المناسب بعد تغيير اللغة
+    help_command(update, context)
+    query.answer()
 
 # التعامل مع الأمر /change_language
 def change_language(update: Update, context: CallbackContext) -> None:
