@@ -55,7 +55,7 @@ def handle_commands(update: Update, context: CallbackContext) -> None:
     command = update.message.text
 
     print(f"Received command from {user_id}: {command}")  # تتبع الأوامر
- context.bot.send_message(chat_id=update.message.chat_id, text="🎉 مرحبًا بك في بوتنا الرائع! استخدم الأمر 'help' لمساعدتك.")
+    context.bot.send_message(chat_id=update.message.chat_id, text="🎉 مرحبًا بك في بوتنا الرائع! استخدم الأمر 'help' لمساعدتك.")
 
 # دالة عرض المساعدة
 def help_command(update: Update, context: CallbackContext) -> None:
