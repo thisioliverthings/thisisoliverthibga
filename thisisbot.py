@@ -46,7 +46,12 @@ def load_user_data(user_id):
         cursor = conn.cursor()
         cursor.execute('SELECT language, balance, account_number FROM users WHERE user_id = ?', (user_id,))
         data = cursor.fetchone()
-    return data if data else ('العربية', 0, generate_account_number())  # إنشاء رقم الحساب إذا لم يكن موجودًا
+    if data:
+        return data
+    else:
+        account_number = generate_account_number()
+        save_user_data(user_id, 'العربية', 0, account_number)
+        return 'العربية', 0, account_number
 
 def handle_message(update: Update, context: CallbackContext) -> None:
     user_id = update.effective_user.id
@@ -100,36 +105,47 @@ def handle_commands(update: Update, context: CallbackContext) -> None:
         elif command == 'info':
             update.message.reply_text("ℹ️ هذا بوت يساعدك في إدارة حسابك.")
         elif command.startswith('إيداع'):
-            amount = float(command.split()[1])
-            balance += amount
-            save_user_data(user_id, language, balance, account_number)
-            update.message.reply_text(f"💵 تم إيداع <b>{amount}</b> بنجاح. رصيدك الجديد هو <b>{balance}</b>.", parse_mode='HTML')
+            try:
+                amount = float(command.split()[1])
+                if amount > 0:
+                    balance += amount
+                    save_user_data(user_id, language, balance, account_number)
+                    update.message.reply_text(f"💵 تم إيداع <b>{amount}</b> بنجاح. رصيدك الجديد هو <b>{balance}</b>.", parse_mode='HTML')
+                else:
+                    update.message.reply_text("❌ يجب أن يكون المبلغ أكبر من صفر.")
+            except (ValueError, IndexError):
+                update.message.reply_text("❌ صيغة الأمر غير صحيحة. يجب أن تكتب: إيداع [المبلغ].")
         elif command.startswith('سحب'):
-            amount = float(command.split()[1])
-            if amount <= balance:
-                balance -= amount
-                save_user_data(user_id, language, balance, account_number)
-                update.message.reply_text(f"💸 تم سحب <b>{amount}</b> بنجاح. رصيدك الجديد هو <b>{balance}</b>.", parse_mode='HTML')
-            else:
-                update.message.reply_text("❌ رصيدك غير كافٍ لإجراء هذه العملية.")
-        elif command.startswith('تحويل'):
-            parts = command.split()
-            amount = float(parts[1])
-            recipient = parts[3]
-
-            recipient_data = load_user_data(int(recipient))
-            if recipient_data:
-                recipient_balance = recipient_data[1]
+            try:
+                amount = float(command.split()[1])
                 if amount <= balance:
                     balance -= amount
-                    recipient_balance += amount
                     save_user_data(user_id, language, balance, account_number)
-                    save_user_data(int(recipient), recipient_data[0], recipient_balance, recipient_data[2])
-                    update.message.reply_text(f"➡️ تم تحويل <b>{amount}</b> إلى <b>{recipient}</b> بنجاح.", parse_mode='HTML')
+                    update.message.reply_text(f"💸 تم سحب <b>{amount}</b> بنجاح. رصيدك الجديد هو <b>{balance}</b>.", parse_mode='HTML')
                 else:
                     update.message.reply_text("❌ رصيدك غير كافٍ لإجراء هذه العملية.")
-            else:
-                update.message.reply_text("❓ لم يتم العثور على المستخدم الذي تحاول التحويل إليه.")
+            except (ValueError, IndexError):
+                update.message.reply_text("❌ صيغة الأمر غير صحيحة. يجب أن تكتب: سحب [المبلغ].")
+        elif command.startswith('تحويل'):
+            try:
+                parts = command.split()
+                amount = float(parts[1])
+                recipient = parts[3]
+                recipient_data = load_user_data(int(recipient))
+                if recipient_data:
+                    recipient_balance = recipient_data[1]
+                    if amount <= balance:
+                        balance -= amount
+                        recipient_balance += amount
+                        save_user_data(user_id, language, balance, account_number)
+                        save_user_data(int(recipient), recipient_data[0], recipient_balance, recipient_data[2])
+                        update.message.reply_text(f"➡️ تم تحويل <b>{amount}</b> إلى <b>{recipient}</b> بنجاح.", parse_mode='HTML')
+                    else:
+                        update.message.reply_text("❌ رصيدك غير كافٍ لإجراء هذه العملية.")
+                else:
+                    update.message.reply_text("❓ لم يتم العثور على المستخدم الذي تحاول التحويل إليه.")
+            except (ValueError, IndexError):
+                update.message.reply_text("❌ صيغة الأمر غير صحيحة. يجب أن تكتب: تحويل [المبلغ] إلى [معرف المستلم].")
         elif command == 'رصيدي':
             update.message.reply_text(f"💰 رصيدك الحالي هو: <b>{balance}</b>.", parse_mode='HTML')
     except Exception as e:
