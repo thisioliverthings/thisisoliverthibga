@@ -140,8 +140,8 @@ def button(update: Update, context: CallbackContext) -> None:
     }
 
     response_message = help_texts.get(query.data, "قسم غير معروف.")
-    query.answer()
-    query.edit_message_text(text=response_message)
+query.answer()
+query.edit_message_text(text=response_message, parse_mode='MarkdownV2')
 
 # التعامل مع الأمر /start
 def start(update: Update, context: CallbackContext) -> None:
